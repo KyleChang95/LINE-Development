@@ -1,6 +1,7 @@
 import AWSLambda from 'aws-lambda'
 import * as line from '@line/bot-sdk'
 // import * as dotenv from 'dotenv'
+// import path from 'path'
 
 const LINE_EMOJI_PRODUCT_ID = '5ac1bfd5040ab15980c9b435'
 const LINE_EMOJI_MAX_NUMBER = 10
@@ -58,9 +59,6 @@ const createMessageList = (): line.Message[] => {
 export const handler = async (event: AWSLambda.APIGatewayEvent) => {
     console.debug(event)
 
-    const webhookEvent = JSON.parse(event.body!) as line.WebhookRequestBody
-    console.debug(JSON.stringify(webhookEvent))
-
     // Load environment variables
     const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN!
     const channelSecret = process.env.LINE_CHANNEL_SECRET!
@@ -72,25 +70,34 @@ export const handler = async (event: AWSLambda.APIGatewayEvent) => {
         channelSecret: channelSecret
     })
 
-    for (const event of webhookEvent.events) {
-        console.log(JSON.stringify(event))
+    const eventBody = JSON.parse(event.body!)
 
-        try {
-            if (event.type === 'message') {
-                // Reply message to user
-                await lineClient.replyMessage(event.replyToken, {
-                    type: 'text',
-                    text: `Reply: ${JSON.stringify(event.message)}`
-                })
-            } else {
-                // Push message to me
-                await lineClient.pushMessage(userIDMyself, {
-                    type: 'text',
-                    text: `Push: ${JSON.stringify(event)}`
-                })          
+    if (eventBody.destination == null) {
+        await lineClient.pushMessage(userIDMyself, {
+            type: 'text',
+            text: eventBody.message
+        })
+    } else {
+        const webhookEvent = eventBody as line.WebhookRequestBody
+        for (const event of webhookEvent.events) {
+            console.log(JSON.stringify(event))
+            try {
+                if (event.type === 'message') {
+                    // Reply message to user
+                    await lineClient.replyMessage(event.replyToken, {
+                        type: 'text',
+                        text: `Reply: ${JSON.stringify(event.message)}`
+                    })
+                } else {
+                    // Push message to me
+                    await lineClient.pushMessage(userIDMyself, {
+                        type: 'text',
+                        text: `Push: ${JSON.stringify(event)}`
+                    })          
+                }
+            } catch (error) {
+                console.error(error)
             }
-        } catch (error) {
-            console.error(error)
         }
     }
 
@@ -100,6 +107,14 @@ export const handler = async (event: AWSLambda.APIGatewayEvent) => {
     }
 }
 
-// dotenv.config({ path: process.env.MYSELF_ENV_PATH })
+// dotenv.config({ path: path.resolve(__dirname, '.env') })
 
-// handler({} as line.WebhookEvent)
+// const body = {
+//     message: 'Hello, LINE!'
+// }
+
+// const event = {
+//     body: JSON.stringify(body)
+// }
+
+// handler(event as AWSLambda.APIGatewayEvent)
